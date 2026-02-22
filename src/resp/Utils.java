@@ -4,7 +4,6 @@ import utils.IncompleteMessageException;
 import utils.RespProtocolException;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 
 public class Utils {
 
@@ -75,19 +74,6 @@ public class Utils {
         byte lf = buffer.get();
         if (cr == '\r' && lf == '\n') return true;
         throw new RespProtocolException("Expected CRLF, got 0x%02X 0x%02X".formatted(cr & 0xFF, lf & 0xFF));
-    }
-
-    /**
-     * Converts a list of type {@link Byte} to an array of the primitive type {@code byte}
-     *
-     * @return the primitive byte array containing all the elements of the input list
-     */
-    protected static byte[] fromByteObjectListToBytePrimitiveArray(List<Byte> list) {
-        byte[] res = new byte[list.size()];
-        for (int i = 0; i < list.size(); i++) {
-            res[i] = list.get(i);
-        }
-        return res;
     }
 
     /**
