@@ -72,6 +72,12 @@ class RespParserTest {
         return (RespArray) result;
     }
 
+    private static RespNullArray assert_NullArray(ByteBuffer b) throws IncompleteMessageException {
+        var result = RespParser.initiateParsing(b);
+        assertInstanceOf(RespNullArray.class, result, "Expected RespNullArray");
+        return (RespNullArray) result;
+    }
+
     private static RespNullBulkString assert_NullBulkString(ByteBuffer b) throws IncompleteMessageException {
         var result = RespParser.initiateParsing(b);
         assertInstanceOf(RespNullBulkString.class, result, "Expected RespNullBulkString");
@@ -95,6 +101,12 @@ class RespParserTest {
         void simpleBulkString() throws IncompleteMessageException {
             var bs = assert_BulkString(buf("$5\r\nhello\r\n"));
             assertEquals("hello", bs.asString());
+        }
+
+        @Test
+        @DisplayName("Simple null array")
+        void simpleNullArray() throws IncompleteMessageException {
+            var na = assert_NullArray(buf("*-1\r\n"));
         }
 
         @Test
@@ -644,6 +656,19 @@ class RespParserTest {
                 v = arr.elements().getFirst();
             }
             assertEquals("leaf", ((RespBulkString) v).asString());
+        }
+
+        @Test
+        @DisplayName("Nested arrays do not throw StackOverflowError (up to reasonable depth)")
+        void nestedArraysWithNullArrayInside() throws IncompleteMessageException {
+            // *2\r\n *-1\r\n  $5\r\n world\r\n
+            String raw = "*2\r\n*-1\r\n$5\r\nworld\r\n";
+            var outer = assert_Array(buf(raw));
+            assertEquals(2, outer.elements().size());
+
+            var inner = assertInstanceOf(RespNullArray.class, outer.elements().getFirst());
+
+            assertEquals("world", ((RespBulkString) outer.elements().get(1)).asString());
         }
     }
 }

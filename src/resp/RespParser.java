@@ -88,7 +88,7 @@ public class RespParser {
         long countResult = parseInteger(inputBuffer);
 
         if (countResult == -1) {
-            return new RespArray(List.of());
+            return new RespNullArray();
         }
 
         if (countResult < 0) {
