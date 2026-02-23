@@ -106,7 +106,7 @@ class RespParserTest {
         @Test
         @DisplayName("Simple null array")
         void simpleNullArray() throws IncompleteMessageException {
-            var na = assert_NullArray(buf("*-1\r\n"));
+            assert_NullArray(buf("*-1\r\n"));
         }
 
         @Test
@@ -666,7 +666,7 @@ class RespParserTest {
             var outer = assert_Array(buf(raw));
             assertEquals(2, outer.elements().size());
 
-            var inner = assertInstanceOf(RespNullArray.class, outer.elements().getFirst());
+            assertInstanceOf(RespNullArray.class, outer.elements().getFirst());
 
             assertEquals("world", ((RespBulkString) outer.elements().get(1)).asString());
         }

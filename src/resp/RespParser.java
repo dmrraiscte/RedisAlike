@@ -115,48 +115,6 @@ public class RespParser {
     }
 
     /**
-     * Parses a simple string after the '+' prefix has already been consumed.
-     * <p></p>
-     * Grammar: [data:bytes]CRLF
-     */
-    private static RespValue parseSimpleString(ByteBuffer inputBuffer) throws IncompleteMessageException {
-        int start = inputBuffer.position();
-        int end = findCRLF(inputBuffer);
-        if (end == -1) {
-            throw new IncompleteMessageException();
-        }
-
-        int length = end - start;
-        byte[] data = new byte[length];
-        inputBuffer.get(data);
-        if (!consumeCRLF(inputBuffer)) {
-            throw new RespProtocolException("Expected CRLF after simple string data");
-        }
-        return new RespSimpleString(data);
-    }
-
-    /**
-     * Parses a simple error after the '-' prefix has already been consumed.
-     * <p></p>
-     * Grammar: [data:bytes]CRLF
-     */
-    private static RespValue parseSimpleError(ByteBuffer inputBuffer) throws IncompleteMessageException {
-        int start = inputBuffer.position();
-        int end = findCRLF(inputBuffer);
-        if (end == -1) {
-            throw new IncompleteMessageException();
-        }
-
-        int length = end - start;
-        byte[] data = new byte[length];
-        inputBuffer.get(data);
-        if (!consumeCRLF(inputBuffer)) {
-            throw new RespProtocolException("Expected CRLF after simple string data");
-        }
-        return new RespSimpleError(data);
-    }
-
-    /**
      * Parses a simple line, following the syntax: {@code <prefix:[+,-]><data>CRLF}
      *
      * @return a byte array with the data
