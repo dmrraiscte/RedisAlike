@@ -10,17 +10,17 @@ import java.util.List;
 import static resp.Utils.*;
 
 public class RespParser {
-    public static RespValue initiateParsing(ByteBuffer inputBuffer) throws IncompleteMessageException {
+    public static RespValue parse(ByteBuffer inputBuffer) throws IncompleteMessageException {
         int savedPosition = inputBuffer.position();
         try {
-            return parse(inputBuffer);
+            return initiateParse(inputBuffer);
         } catch (IncompleteMessageException e) {
             inputBuffer.position(savedPosition);
             throw new IncompleteMessageException(e.getMessage());
         }
     }
 
-    private static RespValue parse(ByteBuffer inputBuffer) throws IncompleteMessageException {
+    private static RespValue initiateParse(ByteBuffer inputBuffer) throws IncompleteMessageException {
         if (!inputBuffer.hasRemaining()) {
             throw new IncompleteMessageException();
         }
@@ -33,6 +33,7 @@ public class RespParser {
             case '+' -> new RespSimpleString(parseSimpleLineReader(inputBuffer));
             case '-' -> new RespSimpleError(parseSimpleLineReader(inputBuffer));
             case ':' -> new RespInteger(parseSimpleLineReader(inputBuffer));
+            case '#' -> parseBoolean(inputBuffer);
             default -> throw new RespProtocolException(
                     "Unexpected type byte: 0x%02X ('%c'".formatted(typeByte & 0xFF, (char) typeByte));
         };
@@ -103,7 +104,7 @@ public class RespParser {
         for (long i = 0; i < countResult; i++) {
             int savedPos = inputBuffer.position();
             try {
-                RespValue elemResult = parse(inputBuffer);
+                RespValue elemResult = initiateParse(inputBuffer);
                 elements.add(elemResult);
             } catch (IncompleteMessageException e) {
                 inputBuffer.position(savedPos);
@@ -115,7 +116,7 @@ public class RespParser {
     }
 
     /**
-     * Parses a simple line, following the syntax: {@code <prefix:[+,-]><data>CRLF}
+     * Parses a simple line, following the syntax: {@code <prefix:[+|-]><data>CRLF}
      *
      * @return a byte array with the data
      */
@@ -133,5 +134,31 @@ public class RespParser {
             throw new RespProtocolException("Expected CRLF after data");
         }
         return data;
+    }
+
+    /**
+     * Parses a boolean, following the syntax: {@code <data:[t|f]>CRLF}
+     *
+     * @return a RespBoolean
+     */
+    private static RespValue parseBoolean(ByteBuffer inputBuffer) throws IncompleteMessageException {
+        int start = inputBuffer.position();
+        int end = findCRLF(inputBuffer);
+        if (end == -1) {
+            throw new IncompleteMessageException();
+        }
+
+        int length = end - start;
+        if (length != 1) {
+            throw new RespProtocolException("Expected only one letter representing a boolean");
+        }
+        byte data = inputBuffer.get();
+        if (!consumeCRLF(inputBuffer)) {
+            throw new RespProtocolException("Expected CRLF after data");
+        }
+        if (data != 't' && data != 'f') {
+            throw new RespProtocolException("Expected either 't' of 'f' representing a boolean. Found: 0x%02X".formatted(data & 0xFF));
+        }
+        return new RespBoolean(data == 't');
     }
 }

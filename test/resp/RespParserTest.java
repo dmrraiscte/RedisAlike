@@ -43,53 +43,59 @@ class RespParserTest {
     }
 
     private static RespBulkString assert_BulkString(ByteBuffer b) throws IncompleteMessageException {
-        var result = RespParser.initiateParsing(b);
+        var result = RespParser.parse(b);
         assertInstanceOf(RespBulkString.class, result, "Expected RespBulkString");
         return (RespBulkString) result;
     }
 
     private static RespSimpleError assert_SimpleError(ByteBuffer b) throws IncompleteMessageException {
-        var result = RespParser.initiateParsing(b);
+        var result = RespParser.parse(b);
         assertInstanceOf(RespSimpleError.class, result, "Expected RespSimpleError");
         return (RespSimpleError) result;
     }
 
     private static RespInteger assert_Integer(ByteBuffer b) throws IncompleteMessageException {
-        var result = RespParser.initiateParsing(b);
+        var result = RespParser.parse(b);
         assertInstanceOf(RespInteger.class, result, "Expected RespInteger");
         return (RespInteger) result;
     }
 
     private static RespSimpleString assert_SimpleString(ByteBuffer b) throws IncompleteMessageException {
-        var result = RespParser.initiateParsing(b);
+        var result = RespParser.parse(b);
         assertInstanceOf(RespSimpleString.class, result, "Expected RespSimpleString");
         return (RespSimpleString) result;
     }
 
     private static RespArray assert_Array(ByteBuffer b) throws IncompleteMessageException {
-        var result = RespParser.initiateParsing(b);
+        var result = RespParser.parse(b);
         assertInstanceOf(RespArray.class, result, "Expected RespArray");
         return (RespArray) result;
     }
 
     private static RespNullArray assert_NullArray(ByteBuffer b) throws IncompleteMessageException {
-        var result = RespParser.initiateParsing(b);
+        var result = RespParser.parse(b);
         assertInstanceOf(RespNullArray.class, result, "Expected RespNullArray");
         return (RespNullArray) result;
     }
 
     private static RespNullBulkString assert_NullBulkString(ByteBuffer b) throws IncompleteMessageException {
-        var result = RespParser.initiateParsing(b);
+        var result = RespParser.parse(b);
         assertInstanceOf(RespNullBulkString.class, result, "Expected RespNullBulkString");
         return (RespNullBulkString) result;
     }
 
+    private static RespBoolean assert_Boolean(ByteBuffer b) throws IncompleteMessageException {
+        var result = RespParser.parse(b);
+        assertInstanceOf(RespBoolean.class, result, "Expected RespBoolean");
+        return (RespBoolean) result;
+    }
+
     private static void assertIncompleteMessageError(ByteBuffer buffer) {
-        assertThrows(IncompleteMessageException.class, () -> RespParser.initiateParsing(buffer));
+        assertThrows(IncompleteMessageException.class, () -> RespParser.parse(buffer));
     }
 
     private static void assertProtocolError(ByteBuffer buffer) {
-        assertThrows(RespProtocolException.class, () -> RespParser.initiateParsing(buffer));
+        assertThrows(RespProtocolException.class, () -> RespParser.parse(buffer));
     }
 
 
@@ -101,6 +107,13 @@ class RespParserTest {
         void simpleBulkString() throws IncompleteMessageException {
             var bs = assert_BulkString(buf("$5\r\nhello\r\n"));
             assertEquals("hello", bs.asString());
+        }
+
+        @Test
+        @DisplayName("Simple boolean")
+        void simpleBoolean() throws IncompleteMessageException {
+            var b = assert_Boolean(buf("#t\r\n"));
+            assertEquals("true", b.asString());
         }
 
         @Test
@@ -157,9 +170,7 @@ class RespParserTest {
         @Test
         @DisplayName("Null array (*-1)")
         void nullArray() throws IncompleteMessageException {
-            var arr = assert_Array(buf("*-1\r\n"));
-            // Our implementation maps null array to empty list.
-            assertTrue(arr.elements().isEmpty());
+            assert_NullArray(buf("*-1\r\n"));
         }
 
         @Test
@@ -193,7 +204,7 @@ class RespParserTest {
             // Append junk after a valid message; position should stop right before it.
             byte[] data = "*1\r\n$2\r\nhi\r\nEXTRA".getBytes(StandardCharsets.UTF_8);
             ByteBuffer b = ByteBuffer.wrap(data);
-            RespParser.initiateParsing(b);
+            RespParser.parse(b);
             // After parsing, remaining bytes should be "EXTRA"
             byte[] remaining = new byte[b.remaining()];
             b.get(remaining);
@@ -409,6 +420,12 @@ class RespParserTest {
             var arr = assert_Array(fullBuf);
             assertEquals(2, arr.elements().size());
         }
+
+        @Test
+        @DisplayName("Boolean without CRLF")
+        void booleanNoCRLF() {
+            assertIncompleteMessageError(buf("#f"));
+        }
     }
 
     @Nested
@@ -588,11 +605,11 @@ class RespParserTest {
         void twoConsecutiveMessagesInSameBuffer() throws IncompleteMessageException {
             ByteBuffer b = buf("$3\r\nfoo\r\n$3\r\nbar\r\n");
 
-            var r1 = RespParser.initiateParsing(b);
+            var r1 = RespParser.parse(b);
             assertInstanceOf(RespValue.class, r1);
             assertEquals("foo", ((RespBulkString) r1).asString());
 
-            var r2 = RespParser.initiateParsing(b);
+            var r2 = RespParser.parse(b);
             assertInstanceOf(RespValue.class, r2);
             assertEquals("bar",
                     ((RespBulkString) r2).asString());
@@ -647,7 +664,7 @@ class RespParserTest {
             String sb = "*1\r\n".repeat(depth) +
                     "$4\r\nleaf\r\n";
 
-            var result = RespParser.initiateParsing(buf(sb));
+            var result = RespParser.parse(buf(sb));
             assertInstanceOf(RespValue.class, result);
             // Unwrap all levels to confirm the leaf value.
             RespValue v = result;
@@ -669,6 +686,12 @@ class RespParserTest {
             assertInstanceOf(RespNullArray.class, outer.elements().getFirst());
 
             assertEquals("world", ((RespBulkString) outer.elements().get(1)).asString());
+        }
+
+        @Test
+        @DisplayName("Boolean with a character not representing true nor false")
+        void booleanWithInvalidValue() {
+            assertProtocolError(buf("#a\r\n"));
         }
     }
 }
