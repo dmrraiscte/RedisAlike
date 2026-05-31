@@ -72,16 +72,14 @@ class RespParserTest {
         return (RespArray) result;
     }
 
-    private static RespNullArray assert_NullArray(ByteBuffer b) throws IncompleteMessageException {
+    private static void assert_NullArray(ByteBuffer b) throws IncompleteMessageException {
         var result = RespParser.parse(b);
         assertInstanceOf(RespNullArray.class, result, "Expected RespNullArray");
-        return (RespNullArray) result;
     }
 
-    private static RespNullBulkString assert_NullBulkString(ByteBuffer b) throws IncompleteMessageException {
+    private static void assert_NullBulkString(ByteBuffer b) throws IncompleteMessageException {
         var result = RespParser.parse(b);
         assertInstanceOf(RespNullBulkString.class, result, "Expected RespNullBulkString");
-        return (RespNullBulkString) result;
     }
 
     private static RespBoolean assert_Boolean(ByteBuffer b) throws IncompleteMessageException {
