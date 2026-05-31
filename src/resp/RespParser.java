@@ -7,7 +7,13 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import static resp.Utils.*;
+import static resp.RespDouble.RespDoubleFromExponent;
+import static resp.RespDouble.RespDoubleFromFraction;
+import static resp.RespDouble.RespDoubleFromIntegral;
+import static resp.Utils.consumeCRLF;
+import static resp.Utils.findCRLF;
+import static resp.Utils.findSeparator;
+import static resp.Utils.parseInteger;
 
 public class RespParser {
     public static RespValue parse(ByteBuffer inputBuffer) throws IncompleteMessageException {
@@ -34,6 +40,7 @@ public class RespParser {
             case '-' -> new RespSimpleError(parseSimpleLineReader(inputBuffer));
             case ':' -> new RespInteger(parseSimpleLineReader(inputBuffer));
             case '#' -> parseBoolean(inputBuffer);
+            case ',' -> parseDouble(inputBuffer);
             default -> throw new RespProtocolException(
                     "Unexpected type byte: 0x%02X ('%c'".formatted(typeByte & 0xFF, (char) typeByte));
         };
@@ -116,7 +123,7 @@ public class RespParser {
     }
 
     /**
-     * Parses a simple line, following the syntax: {@code <prefix:[+|-]><data>CRLF}
+     * Parses a simple line, following the syntax: {@code <prefix:[+|-|:]><data>CRLF}
      *
      * @return a byte array with the data
      */
@@ -160,5 +167,105 @@ public class RespParser {
             throw new RespProtocolException("Expected either 't' of 'f' representing a boolean. Found: 0x%02X".formatted(data & 0xFF));
         }
         return new RespBoolean(data == 't');
+    }
+
+    /**
+     * Parses a double, following the syntax: {@code [<+|->]<integral>[.<fractional>][<E|e>[sign]<exponent>]CRLF}
+     * @return a RespDouble
+     */
+    private static RespValue parseDouble(ByteBuffer inputBuffer) throws IncompleteMessageException {
+        int start = inputBuffer.position();
+        int end = findCRLF(inputBuffer);
+        if (end == -1) {
+            throw new IncompleteMessageException();
+        }
+
+        int fractionalSeparator = findSeparator(inputBuffer, '.');
+        int exponentSeparator = findSeparator(inputBuffer, 'e');
+        if (fractionalSeparator == -1 && exponentSeparator == -1) {
+            return parsingSimpleDouble(inputBuffer, start, end);
+        } else if (fractionalSeparator == -1) {
+            return parsingDoubleWithExponent(inputBuffer, start, end, exponentSeparator);
+        } else if (exponentSeparator == -1) {
+            return parsingDoubleWithFraction(inputBuffer, start, end, fractionalSeparator);
+        } else {
+            return parsingComplexDouble(inputBuffer, start, end, fractionalSeparator, exponentSeparator);
+        }
+    }
+
+    /**
+     * Helper function to parse a simple double value with only integral part
+     * @param inputBuffer the input
+     * @param start the start of the buffer
+     * @param end the end of the buffer
+     * @return a RespDouble object with corresponding integral part
+     */
+    private static RespDouble parsingSimpleDouble(ByteBuffer inputBuffer, int start, int end) {
+        byte[] integral = new byte[end - start];
+        inputBuffer.get(integral);
+        if (!consumeCRLF(inputBuffer)) {
+            throw new RespProtocolException("Expected CRLF after data");
+        }
+        return RespDoubleFromIntegral(integral);
+    }
+
+    /**
+     * Helper function to parse a double value with integral and exponent
+     * @param inputBuffer the input
+     * @param start the start of the buffer
+     * @param end the end of the buffer
+     * @return a RespDouble object with corresponding integral part and exponent
+     */
+    private static RespDouble parsingDoubleWithExponent(ByteBuffer inputBuffer, int start, int end, int exponentSeparator) {
+        byte[] integral = new byte[exponentSeparator - start];
+        byte[] exponent = new byte[end - exponentSeparator - 1];
+        inputBuffer.get(integral);
+        inputBuffer.get();
+        inputBuffer.get(exponent);
+        if (!consumeCRLF(inputBuffer)) {
+            throw new RespProtocolException("Expected CRLF after data");
+        }
+        return RespDoubleFromExponent(integral, exponent);
+    }
+
+    /**
+     * Helper function to parse a double value with integral part and fraction
+     * @param inputBuffer the input
+     * @param start the start of the buffer
+     * @param end the end of the buffer
+     * @return a RespDouble object with corresponding integral part and fraction
+     */
+    private static RespDouble parsingDoubleWithFraction(ByteBuffer inputBuffer, int start, int end, int fractionalSeparator) {
+        byte[] integral = new byte[fractionalSeparator - start];
+        byte[] fractional = new byte[end - fractionalSeparator - 1];
+        inputBuffer.get(integral);
+        inputBuffer.get();
+        inputBuffer.get(fractional);
+        if (!consumeCRLF(inputBuffer)) {
+            throw new RespProtocolException("Expected CRLF after data");
+        }
+        return RespDoubleFromFraction(integral, fractional);
+    }
+
+    /**
+     * Helper function to parse a double value with integral, fraction, and exponent parts
+     * @param inputBuffer the input
+     * @param start the start of the buffer
+     * @param end the end of the buffer
+     * @return a RespDouble object with parts
+     */
+    private static RespDouble parsingComplexDouble(ByteBuffer inputBuffer, int start, int end, int fractionalSeparator, int exponentSeparator) {
+        byte[] integral = new byte[fractionalSeparator - start];
+        byte[] fractional = new byte[exponentSeparator - fractionalSeparator - 1];
+        byte[] exponent = new byte[end - exponentSeparator - 1];
+        inputBuffer.get(integral);
+        inputBuffer.get();
+        inputBuffer.get(fractional);
+        inputBuffer.get();
+        inputBuffer.get(exponent);
+        if (!consumeCRLF(inputBuffer)) {
+            throw new RespProtocolException("Expected CRLF after data");
+        }
+        return new RespDouble(integral, fractional, exponent);
     }
 }

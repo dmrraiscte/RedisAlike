@@ -90,6 +90,12 @@ class RespParserTest {
         return (RespBoolean) result;
     }
 
+    private static RespDouble assert_Double(ByteBuffer b) throws IncompleteMessageException {
+        var result = RespParser.parse(b);
+        assertInstanceOf(RespDouble.class, result, "Expected RespDouble");
+        return (RespDouble) result;
+    }
+
     private static void assertIncompleteMessageError(ByteBuffer buffer) {
         assertThrows(IncompleteMessageException.class, () -> RespParser.parse(buffer));
     }
@@ -267,6 +273,49 @@ class RespParserTest {
             var bs = assert_Integer(buf(":-89\r\n"));
             assertEquals("-89", bs.asString());
         }
+
+        @Test
+        @DisplayName("Simple double")
+        void simpleDouble() throws IncompleteMessageException {
+            var bs = assert_Double(buf(",89\r\n"));
+            assertEquals("89.0", bs.asString());
+        }
+
+        @Test
+        @DisplayName("Simple double with sign")
+        void simpleDoubleWithSign() throws IncompleteMessageException {
+            var bs = assert_Double(buf(",-87\r\n"));
+            assertEquals("-87.0", bs.asString());
+        }
+
+        @Test
+        @DisplayName("Simple double with sign and fraction")
+        void simpleDoubleWithFraction() throws IncompleteMessageException {
+            var bs = assert_Double(buf(",-82.78\r\n"));
+            assertEquals("-82.78", bs.asString());
+        }
+
+        @Test
+        @DisplayName("Simple double with sign and exponent")
+        void simpleDoubleWithExponent() throws IncompleteMessageException {
+            var bs = assert_Double(buf(",+82e3\r\n"));
+            assertEquals("82000.0", bs.asString());
+        }
+
+        @Test
+        @DisplayName("Simple double with sign and signed exponent")
+        void simpleDoubleWithSignedExponent() throws IncompleteMessageException {
+            var bs = assert_Double(buf(",+82e-3\r\n"));
+            assertEquals("0.082", bs.asString());
+        }
+
+        @Test
+        @DisplayName("Simple double with fraction and exponent")
+        void simpleDoubleWithFractionAndExponent() throws IncompleteMessageException {
+            var bs = assert_Double(buf(",82.64e-3\r\n"));
+            assertEquals("0.08264", bs.asString());
+        }
+
     }
 
     @Nested
@@ -432,7 +481,7 @@ class RespParserTest {
     @DisplayName("Unsupported type bytes – must throw RespProtocolException")
     class UnsupportedTypes {
         @ParameterizedTest(name = "Type byte ''{0}''")
-        @ValueSource(strings = {"_", ",", "(", "!", "=", "%", "~", "|", ">", "?"})
+        @ValueSource(strings = {"_", "(", "!", "=", "%", "~", "|", ">", "?"})
         @DisplayName("All RESP3 / non-bulk-string / non-array type bytes / non-simple-string")
         void unsupportedTypeByte(String typeChar) {
             assertProtocolError(buf(typeChar + "OK\r\n"));
@@ -692,6 +741,17 @@ class RespParserTest {
         @DisplayName("Boolean with a character not representing true nor false")
         void booleanWithInvalidValue() {
             assertProtocolError(buf("#a\r\n"));
+        }
+
+        @Test
+        @DisplayName("Infinite double values and Nan")
+        void infiniteDoubles() throws IncompleteMessageException {
+            String positiveInf = ",inf\r\n";
+            String negativeInf = ",-inf\r\n";
+            String nan = ",nan\r\n";
+            assertEquals("Infinity", ((RespDouble) RespParser.parse(buf(positiveInf))).asString());
+            assertEquals("-Infinity", ((RespDouble) RespParser.parse(buf(negativeInf))).asString());
+            assertEquals("NaN", ((RespDouble) RespParser.parse(buf(nan))).asString());
         }
     }
 }

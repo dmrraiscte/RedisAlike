@@ -4,7 +4,6 @@ import utils.IncompleteMessageException;
 import utils.RespProtocolException;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 
 public class Utils {
 
@@ -78,19 +77,6 @@ public class Utils {
     }
 
     /**
-     * Converts a list of type {@link Byte} to an array of the primitive type {@code byte}
-     *
-     * @return the primitive byte array containing all the elements of the input list
-     */
-    protected static byte[] fromByteObjectListToBytePrimitiveArray(List<Byte> list) {
-        byte[] res = new byte[list.size()];
-        for (int i = 0; i < list.size(); i++) {
-            res[i] = list.get(i);
-        }
-        return res;
-    }
-
-    /**
      * Finds the first occurrence of CRLF
      *
      * @return the position of the CR byte, or {@code -1} if it doesn't exist
@@ -104,6 +90,48 @@ public class Utils {
             }
         }
         return -1;
+    }
+
+    /**
+     * This method searches for the first occurrence of the given separator (case-insensitive for letters)
+     * @return the position of the first separator occurrence, or {@code -1} if it does not exist.
+     */
+    protected static int findSeparator(ByteBuffer buffer, char separator) {
+        if (buffer == null) {
+            return -1;
+        }
+
+        int start = buffer.position();
+        int end = buffer.limit();
+
+        char sepLower = Character.toLowerCase(separator);
+        char sepUpper = Character.toUpperCase(separator);
+
+        for (int i = start; i < end; i++) {
+            byte b = buffer.get(i);
+            char c = (char) (b & 0xFF); // treat byte as unsigned
+
+            if (c == separator) {
+                return i;
+            }
+
+            // case-insensitive match for letters
+            if (Character.isLetter(separator)) {
+                if (c == sepLower || c == sepUpper) {
+                    return i;
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    protected static boolean bufferEquals(byte[] buf1, byte[] buf2) {
+        if(buf1.length != buf2.length) return false;
+        for (int i = 0; i < buf1.length; i++) {
+            if(buf1[i] != buf2[i]) return false;
+        }
+        return true;
     }
 
 }
